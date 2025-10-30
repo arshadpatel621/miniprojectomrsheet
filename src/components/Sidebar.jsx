@@ -16,9 +16,16 @@ const Sidebar = () => {
 
   const NavContent = () => (
     <>
-      <div className="p-6 border-b border-gray-200">
-        <h1 className="text-2xl font-bold text-primary-700">OMR Scanner</h1>
-        <p className="text-sm text-gray-500 mt-1">Admin Dashboard</p>
+      <div className="p-6 border-b border-gray-200 bg-gradient-to-br from-primary-50 to-blue-50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+            <span className="text-white text-xl font-bold">O</span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-blue-700 bg-clip-text text-transparent">OMR Scanner</h1>
+            <p className="text-sm text-gray-600 mt-0.5">Admin Dashboard</p>
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
@@ -67,7 +74,7 @@ const Sidebar = () => {
       </button>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 shadow-sm z-40">
+      <aside className="hidden lg:flex lg:flex-col fixed left-0 top-0 h-screen w-64 bg-white/95 backdrop-blur-md border-r border-gray-200 shadow-xl z-40">
         <NavContent />
       </aside>
 
@@ -87,7 +94,7 @@ const Sidebar = () => {
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ type: 'spring', damping: 25 }}
-              className="lg:hidden fixed left-0 top-0 h-screen w-64 bg-white shadow-2xl z-50 flex flex-col"
+              className="lg:hidden fixed left-0 top-0 h-screen w-64 bg-white/95 backdrop-blur-md shadow-2xl z-50 flex flex-col"
             >
               <NavContent />
             </motion.aside>

@@ -80,12 +80,13 @@ const Home = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="card hover:shadow-lg transition-shadow duration-200"
+            whileHover={{ y: -5, transition: { duration: 0.2 } }}
+            className="stat-card group cursor-pointer"
           >
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between relative z-10">
               <div>
-                <p className="text-sm text-gray-600 mb-1">{stat.title}</p>
-                <p className={`text-2xl font-bold ${stat.color}`}>
+                <p className="text-sm font-medium text-gray-600 mb-2">{stat.title}</p>
+                <p className={`text-3xl font-bold ${stat.color} transition-all duration-300 group-hover:scale-110`}>
                   {stat.isTime ? (
                     <span className="text-base">{stat.value}</span>
                   ) : (
@@ -93,8 +94,8 @@ const Home = () => {
                   )}
                 </p>
               </div>
-              <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={`w-6 h-6 ${stat.color}`} />
+              <div className={`p-4 rounded-2xl ${stat.bgColor} shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110`}>
+                <stat.icon className={`w-7 h-7 ${stat.color}`} />
               </div>
             </div>
           </motion.div>
@@ -111,30 +112,33 @@ const Home = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <a
             href="/upload"
-            className="p-6 border-2 border-primary-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-all duration-200 text-center group"
+            className="p-6 border-2 border-primary-200 rounded-2xl hover:border-primary-500 bg-gradient-to-br from-white to-primary-50 hover:shadow-xl transition-all duration-300 text-center group relative overflow-hidden"
           >
-            <FileCheck className="w-12 h-12 text-primary-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-gray-800 mb-1">Upload Sheets</h3>
-            <p className="text-sm text-gray-600">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary-100/0 to-primary-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <FileCheck className="w-12 h-12 text-primary-600 mx-auto mb-3 group-hover:scale-125 group-hover:rotate-3 transition-all duration-300 relative z-10" />
+            <h3 className="font-bold text-gray-800 mb-2 relative z-10">Upload Sheets</h3>
+            <p className="text-sm text-gray-600 relative z-10">
               Upload answer keys and student sheets
             </p>
           </a>
 
           <a
             href="/results"
-            className="p-6 border-2 border-green-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-all duration-200 text-center group"
+            className="p-6 border-2 border-green-200 rounded-2xl hover:border-green-500 bg-gradient-to-br from-white to-green-50 hover:shadow-xl transition-all duration-300 text-center group relative overflow-hidden"
           >
-            <TrendingUp className="w-12 h-12 text-green-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-gray-800 mb-1">View Results</h3>
-            <p className="text-sm text-gray-600">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-100/0 to-green-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <TrendingUp className="w-12 h-12 text-green-600 mx-auto mb-3 group-hover:scale-125 group-hover:rotate-3 transition-all duration-300 relative z-10" />
+            <h3 className="font-bold text-gray-800 mb-2 relative z-10">View Results</h3>
+            <p className="text-sm text-gray-600 relative z-10">
               Check scanned results and rankings
             </p>
           </a>
 
-          <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all duration-200 text-center group">
-            <Users className="w-12 h-12 text-gray-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-gray-800 mb-1">Reports</h3>
-            <p className="text-sm text-gray-600">Generate detailed reports</p>
+          <div className="p-6 border-2 border-purple-200 rounded-2xl hover:border-purple-500 bg-gradient-to-br from-white to-purple-50 hover:shadow-xl transition-all duration-300 text-center group relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-100/0 to-purple-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <Users className="w-12 h-12 text-purple-600 mx-auto mb-3 group-hover:scale-125 group-hover:rotate-3 transition-all duration-300 relative z-10" />
+            <h3 className="font-bold text-gray-800 mb-2 relative z-10">Reports</h3>
+            <p className="text-sm text-gray-600 relative z-10">Generate detailed reports</p>
           </div>
         </div>
       </motion.div>
@@ -143,19 +147,43 @@ const Home = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
-        className="card bg-gradient-to-r from-primary-500 to-blue-600 text-white"
+        className="relative overflow-hidden rounded-2xl"
       >
-        <h2 className="text-2xl font-bold mb-2">Getting Started</h2>
-        <p className="mb-4 opacity-90">
-          Follow these steps to scan and evaluate OMR sheets:
-        </p>
-        <ol className="space-y-2 list-decimal list-inside">
-          <li>Upload the answer key (CSV, XLSX, or TXT format)</li>
-          <li>Upload student answer sheets</li>
-          <li>Select the class/grade</li>
-          <li>Click "Scan Sheets" to process</li>
-          <li>View and download results from the Results page</li>
-        </ol>
+        <div className="absolute inset-0 bg-gradient-to-r from-primary-600 via-blue-600 to-indigo-600 opacity-90"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-20"></div>
+        <div className="relative p-8 text-white">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <FileCheck className="w-6 h-6 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold">Getting Started</h2>
+          </div>
+          <p className="mb-6 opacity-90 text-lg">
+            Follow these steps to scan and evaluate OMR sheets:
+          </p>
+          <ol className="space-y-3">
+            <li className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-sm font-bold">1</span>
+              <span className="pt-0.5">Upload the answer key (CSV, XLSX, or TXT format)</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-sm font-bold">2</span>
+              <span className="pt-0.5">Upload student answer sheets</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-sm font-bold">3</span>
+              <span className="pt-0.5">Select the class/grade</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-sm font-bold">4</span>
+              <span className="pt-0.5">Click "Scan Sheets" to process</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-white/20 rounded-full flex items-center justify-center text-sm font-bold">5</span>
+              <span className="pt-0.5">View and download results from the Results page</span>
+            </li>
+          </ol>
+        </div>
       </motion.div>
     </div>
   );
