@@ -10,6 +10,7 @@ const Results = () => {
   const [results, setResults] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: 'rank', direction: 'asc' });
   const [exportFormat, setExportFormat] = useState('csv');
+  const [selectedResult, setSelectedResult] = useState(null);
 
   useEffect(() => {
     const storedResults = JSON.parse(localStorage.getItem('omr_results') || '[]');
@@ -221,6 +222,9 @@ const Results = () => {
                   <th className="px-6 py-4 text-left text-sm font-bold text-gray-800">
                     Score
                   </th>
+                  <th className="px-6 py-4 text-left text-sm font-bold text-gray-800">
+                    Details
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -277,6 +281,14 @@ const Results = () => {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {result.correctAnswers}/{result.totalQuestions}
                     </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => setSelectedResult(result)}
+                        className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium transition-colors"
+                      >
+                        View Details
+                      </button>
+                    </td>
                   </motion.tr>
                 ))}
               </tbody>
@@ -326,6 +338,90 @@ const Results = () => {
             </div>
           </div>
         </motion.div>
+      )}
+
+      {selectedResult && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+              <h3 className="text-2xl font-bold text-gray-800">Student Details</h3>
+              <button
+                onClick={() => setSelectedResult(null)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Name</p>
+                  <p className="text-lg font-semibold">{selectedResult.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Roll Number</p>
+                  <p className="text-lg font-semibold">{selectedResult.rollNumber}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Class</p>
+                  <p className="text-lg font-semibold">{selectedResult.class}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Rank</p>
+                  <p className="text-lg font-semibold">#{selectedResult.rank}</p>
+                </div>
+              </div>
+
+              {/* Performance Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                  <p className="text-xs text-blue-700 mb-1">Total Questions</p>
+                  <p className="text-2xl font-bold text-blue-900">{selectedResult.totalQuestions}</p>
+                </div>
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                  <p className="text-xs text-green-700 mb-1">Correct</p>
+                  <p className="text-2xl font-bold text-green-900">{selectedResult.correctAnswers}</p>
+                </div>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                  <p className="text-xs text-red-700 mb-1">Wrong</p>
+                  <p className="text-2xl font-bold text-red-900">{selectedResult.totalQuestions - selectedResult.correctAnswers}</p>
+                </div>
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-center">
+                  <p className="text-xs text-purple-700 mb-1">Percentage</p>
+                  <p className="text-2xl font-bold text-purple-900">{selectedResult.marks}%</p>
+                </div>
+              </div>
+
+              {/* Performance Bar */}
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium">Performance</span>
+                  <span className="text-sm font-medium">{selectedResult.correctAnswers}/{selectedResult.totalQuestions}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      selectedResult.marks >= 80
+                        ? 'bg-gradient-to-r from-green-500 to-green-600'
+                        : selectedResult.marks >= 60
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600'
+                        : selectedResult.marks >= 40
+                        ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                        : 'bg-gradient-to-r from-red-500 to-red-600'
+                    }`}
+                    style={{ width: `${selectedResult.marks}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
