@@ -2,41 +2,56 @@ import React, { useEffect, useState } from 'react';
 import { getImage } from '../utils/indexedStorage';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, CheckCircle, XCircle, Circle, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Circle, FileText, Printer } from 'lucide-react';
 
 const StudentDetail = () => {
   const { rollNumber } = useParams();
   const navigate = useNavigate();
   const [studentData, setStudentData] = useState(null);
   const [answerKey, setAnswerKey] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     // Load student data from localStorage
     (async () => {
+      setLoading(true);
       const results = JSON.parse(localStorage.getItem('omr_results') || '[]');
       const student = results.find(s => s.rollNumber === rollNumber);
 
       if (student) {
-        const thumbKey = student.rollNumber || student.name || `${student.rank}`;
-        let image = student.image || null;
-        if (!image) {
-          try {
-            image = await getImage(thumbKey);
-          } catch (err) {
-            console.warn('Failed to load thumbnail from IndexedDB', err);
-            image = null;
-          }
+        // Try to load image from IndexedDB
+        let imageDataUrl = null;
+        try {
+          imageDataUrl = await getImage(rollNumber);
+        } catch (err) {
+          console.warn('Failed to load image from IndexedDB', err);
         }
-        setStudentData({ ...student, image });
+        setStudentData({ ...student, imageDataUrl });
+        setNotFound(false);
+      } else {
+        setNotFound(true);
       }
 
-      // Load answer key from localStorage
+      // Load answer key from localStorage (if stored separately)
       const storedAnswerKey = JSON.parse(localStorage.getItem('answer_key') || '[]');
       setAnswerKey(storedAnswerKey);
+      setLoading(false);
     })();
   }, [rollNumber]);
 
-  if (!studentData) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-600 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading student details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !studentData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
@@ -101,33 +116,18 @@ const StudentDetail = () => {
     return sim >= 0.75 ? 'correct' : 'wrong';
   };
 
-  // Calculate statistics
-  // Determine total questions dynamically from stored answer key or student data
-  const detectedTotalFromKey = answerKey && answerKey.length ? answerKey.length : 0;
-  const detectedTotalFromStudent = studentData && studentData.totalQuestions ? studentData.totalQuestions : (studentData && studentData.answers ? studentData.answers.length : 0);
-  const totalQuestions = detectedTotalFromKey || detectedTotalFromStudent || 200;
+  // Calculate statistics - use new data structure if available
+  const totalQuestions = studentData.totalQuestions || 200;
+  const correctCount = studentData.correctAnswers || 0;
+  const wrongCount = studentData.wrongAnswers || 0;
+  const unattemptedCount = studentData.unattempted || 0;
+  const totalMarks = studentData.totalMarks || 0;
+  const maxMarks = studentData.maxMarks || 0;
+  const percentage = studentData.percentage || 0;
 
-  const getCountsFromComparison = () => {
-    let correct = 0;
-    let wrong = 0;
-    let unattempted = 0;
-
-    for (let i = 0; i < totalQuestions; i++) {
-      const studentAnswer = studentData.answers ? studentData.answers[i] : '';
-      const correctAnswer = answerKey && answerKey[i] ? answerKey[i].answer : '';
-      const status = compareAnswers(studentAnswer, correctAnswer);
-      if (status === 'correct') correct++;
-      else if (status === 'wrong') wrong++;
-      else if (status === 'unattempted') unattempted++;
-    }
-
-    return { correct, wrong, unattempted };
-  };
-
-  const { correct: correctCount, wrong: wrongCount, unattempted: unattemptedCount } = getCountsFromComparison();
-
-  // Generate answer comparison data
-  const getAnswerComparison = () => {
+  // Use detailed answers if available, otherwise generate from answer comparison
+  const answerComparison = studentData.detailedAnswers || (() => {
+    console.log('⚠️ detailedAnswers not found, generating from answer key');
     const comparison = [];
     for (let i = 0; i < totalQuestions; i++) {
       const studentAnswer = studentData.answers ? studentData.answers[i] : '';
@@ -135,117 +135,189 @@ const StudentDetail = () => {
       const status = compareAnswers(studentAnswer, correctAnswer);
 
       comparison.push({
-        question: i + 1,
-        studentAnswer: studentAnswer || '-',
-        correctAnswer: correctAnswer || '-',
-        status: status
+        questionNumber: i + 1,
+        studentAnswer: studentAnswer || '',
+        correctAnswer: correctAnswer || '',
+        isCorrect: status === 'correct',
+        isAttempted: status !== 'unattempted'
       });
     }
     return comparison;
+  })();
+
+  console.log('📊 Student Detail Page Debug Info:');
+  console.log('- Total Questions:', totalQuestions);
+  console.log('- Answer Comparison Length:', answerComparison.length);
+  console.log('- Correct:', correctCount);
+  console.log('- Wrong:', wrongCount);
+  console.log('- Unattempted:', unattemptedCount);
+  console.log('- Has detailedAnswers:', !!studentData.detailedAnswers);
+
+  const handlePrint = () => {
+    window.print();
   };
 
-  const answerComparison = getAnswerComparison();
-
   const renderAnswerBubble = (answer) => {
-    if (answer.status === 'correct') {
+    const isCorrect = answer.isCorrect;
+    const isAttempted = answer.isAttempted;
+
+    if (isCorrect) {
       return (
         <div className="flex items-center space-x-2 p-2 bg-green-50 rounded border border-green-200">
           <CheckCircle className="w-5 h-5 text-green-600" />
-          <span className="font-semibold text-green-700">{answer.studentAnswer}</span>
+          <span className="font-semibold text-green-700">{answer.studentAnswer || '-'}</span>
         </div>
       );
-    } else if (answer.status === 'wrong') {
+    } else if (isAttempted && !isCorrect) {
       return (
         <div className="flex flex-col space-y-1 p-2 bg-red-50 rounded border border-red-200">
           <div className="flex items-center space-x-2">
             <XCircle className="w-5 h-5 text-red-600" />
-            <span className="font-semibold text-red-700 line-through">{answer.studentAnswer}</span>
+            <span className="font-semibold text-red-700 line-through">{answer.studentAnswer || '-'}</span>
           </div>
           <div className="flex items-center space-x-2 pl-7">
             <CheckCircle className="w-4 h-4 text-green-600" />
-            <span className="text-sm text-green-700">{answer.correctAnswer}</span>
+            <span className="text-sm text-green-700">{answer.correctAnswer || '-'}</span>
           </div>
         </div>
       );
-    } else if (answer.status === 'unattempted') {
+    } else {
       return (
-        <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded border border-gray-200">
-          <Circle className="w-5 h-5 text-gray-400" />
-          <span className="text-gray-500">Not Attempted</span>
+        <div className="flex flex-col space-y-1 p-2 bg-gray-50 rounded border border-gray-200">
+          <div className="flex items-center space-x-2">
+            <Circle className="w-5 h-5 text-gray-400" />
+            <span className="text-gray-500">Not Attempted</span>
+          </div>
+          <div className="flex items-center space-x-2 pl-7">
+            <CheckCircle className="w-4 h-4 text-green-600" />
+            <span className="text-sm text-green-700">{answer.correctAnswer || '-'}</span>
+          </div>
         </div>
       );
     }
-    return null;
   };
 
   const renderCompleteSheet = () => {
     return (
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-          <FileText className="w-6 h-6 mr-2 text-indigo-600" />
-          {`Complete Answer Sheet (Q1 - Q${totalQuestions})`}
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {answerComparison.slice(0, totalQuestions).map((answer) => (
-            <div key={answer.question} className="border border-gray-200 rounded-lg p-3 bg-white">
-              <div className="text-sm font-semibold text-gray-600 mb-2">Q{answer.question}</div>
-              {renderAnswerBubble(answer)}
-              <div className="mt-2 text-xs text-gray-500">
-                <div>Student: <span className="font-medium text-gray-700">{answer.studentAnswer}</span></div>
-                <div>Correct: <span className="font-medium text-gray-700">{answer.correctAnswer || '-'}</span></div>
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-800 flex items-center">
+            <FileText className="w-6 h-6 mr-2 text-indigo-600" />
+            {`Complete Answer Sheet (Q1 - Q${totalQuestions})`}
+          </h3>
+          <div className="px-4 py-2 bg-indigo-100 rounded-lg">
+            <span className="text-sm font-semibold text-indigo-800">
+              Showing {answerComparison.length} questions
+            </span>
+          </div>
         </div>
+
+        {answerComparison.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p className="text-lg font-medium mb-2">No question data available</p>
+            <p className="text-sm">Please re-upload the student sheets to generate detailed question data.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {answerComparison.map((answer) => (
+              <div key={answer.questionNumber} className="border border-gray-200 rounded-lg p-3 bg-white print:break-inside-avoid hover:shadow-md transition-shadow">
+                <div className="text-sm font-semibold text-gray-600 mb-2">Q{answer.questionNumber}</div>
+                {renderAnswerBubble(answer)}
+                <div className="mt-2 text-xs text-gray-500">
+                  <div>Student: <span className="font-medium text-gray-700">{answer.studentAnswer || '-'}</span></div>
+                  <div>Correct: <span className="font-medium text-gray-700">{answer.correctAnswer || '-'}</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
+    <>
+      <style>{`
+        @media print {
+          body {
+            background: white;
+            margin: 0;
+            padding: 20px;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+          .print\\:break-inside-avoid {
+            break-inside: avoid;
+          }
+          @page {
+            size: A4;
+            margin: 15mm;
+          }
+        }
+      `}</style>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
-          <button
-            onClick={() => navigate('/results')}
-            className="flex items-center text-indigo-600 hover:text-indigo-800 mb-4"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Results
-          </button>
+          <div className="flex items-center justify-between mb-4 print:hidden">
+            <button
+              onClick={() => navigate('/results')}
+              className="flex items-center text-indigo-600 hover:text-indigo-800"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Results
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <Printer className="w-5 h-5 mr-2" />
+              Print Result
+            </button>
+          </div>
 
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">Student Answer Sheet</h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">Student Answer Sheet - NEET Format</h1>
 
             {/* Student Info */}
             {/* Scanned sheet image (if available) */}
-            {studentData.image && (
-              <div className="mb-4">
-                <img src={studentData.image} alt="Scanned Sheet" className="w-full max-w-xl rounded-lg shadow-sm border" />
+            {studentData.imageDataUrl && (
+              <div className="mb-4 print:hidden">
+                <img src={studentData.imageDataUrl} alt="Scanned Sheet" className="w-full max-w-xl rounded-lg shadow-sm border" />
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               <div className="bg-indigo-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Name</p>
                 <p className="text-lg font-semibold text-gray-800">{studentData.name}</p>
               </div>
               <div className="bg-indigo-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Roll Number</p>
-                <p className="text-lg font-semibold text-gray-800">{studentData.rollNumber}</p>
+                <p className="text-lg font-semibold text-gray-800 font-mono">{studentData.rollNumber}</p>
               </div>
               <div className="bg-indigo-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Class</p>
-                <p className="text-lg font-semibold text-gray-800">{studentData.class || 'N/A'}</p>
+                <p className="text-sm text-gray-600">Hall Ticket</p>
+                <p className="text-lg font-semibold text-gray-800 font-mono">{studentData.hallTicket || 'N/A'}</p>
               </div>
               <div className="bg-indigo-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Marks</p>
-                <p className="text-lg font-semibold text-gray-800">{studentData.marks}%</p>
+                <p className="text-sm text-gray-600">Rank</p>
+                <p className="text-lg font-semibold text-gray-800">#{studentData.rank}</p>
               </div>
+              <div className="bg-indigo-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Total Marks</p>
+                <p className="text-lg font-semibold text-gray-800">{totalMarks}/{maxMarks}</p>
+              </div>
+            </div>
+
+            {/* NEET Marking Info */}
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm font-semibold text-blue-800 mb-2">NEET Marking Scheme:</p>
+              <p className="text-xs text-blue-700">+4 for each correct answer | -1 for each wrong answer | 0 for unattempted</p>
             </div>
 
             {/* Statistics */}
@@ -289,16 +361,83 @@ const StudentDetail = () => {
           </div>
         </motion.div>
 
-        {/* Answer Sheet Sections */}
+        {/* Summary Section - Show lists of correct/wrong questions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          className="bg-white rounded-lg shadow-md p-6 mb-6"
+        >
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Question Summary</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Correct Answers */}
+            <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+              <h4 className="text-lg font-bold text-green-800 mb-3 flex items-center">
+                <CheckCircle className="w-5 h-5 mr-2" />
+                Correct ({correctCount})
+              </h4>
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                {answerComparison
+                  .filter(a => a.isCorrect)
+                  .map(a => (
+                    <span key={a.questionNumber} className="px-2 py-1 bg-green-600 text-white rounded text-xs font-semibold">
+                      Q{a.questionNumber}
+                    </span>
+                  ))}
+                {correctCount === 0 && <p className="text-sm text-green-700">No correct answers</p>}
+              </div>
+            </div>
+
+            {/* Wrong Answers */}
+            <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200">
+              <h4 className="text-lg font-bold text-red-800 mb-3 flex items-center">
+                <XCircle className="w-5 h-5 mr-2" />
+                Wrong ({wrongCount})
+              </h4>
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                {answerComparison
+                  .filter(a => a.isAttempted && !a.isCorrect)
+                  .map(a => (
+                    <span key={a.questionNumber} className="px-2 py-1 bg-red-600 text-white rounded text-xs font-semibold">
+                      Q{a.questionNumber}
+                    </span>
+                  ))}
+                {wrongCount === 0 && <p className="text-sm text-red-700">No wrong answers</p>}
+              </div>
+            </div>
+
+            {/* Unattempted */}
+            <div className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
+              <h4 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
+                <Circle className="w-5 h-5 mr-2" />
+                Unattempted ({unattemptedCount})
+              </h4>
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                {answerComparison
+                  .filter(a => !a.isAttempted)
+                  .map(a => (
+                    <span key={a.questionNumber} className="px-2 py-1 bg-gray-600 text-white rounded text-xs font-semibold">
+                      Q{a.questionNumber}
+                    </span>
+                  ))}
+                {unattemptedCount === 0 && <p className="text-sm text-gray-700">All questions attempted</p>}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Answer Sheet Sections */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
         >
           {renderCompleteSheet()}
         </motion.div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

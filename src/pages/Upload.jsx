@@ -5,6 +5,7 @@ import FileDropZone from '../components/FileDropZone';
 import { CheckCircle, Loader, FileText, Image as ImageIcon } from 'lucide-react';
 import Papa from 'papaparse';
 import { processOMRSheet, processMultiPagePDF } from '../utils/omrProcessor';
+import { saveImage } from '../utils/indexedStorage';
 
 const Upload = () => {
   const [answerKey, setAnswerKey] = useState([]);
@@ -14,6 +15,13 @@ const Upload = () => {
   const [scanComplete, setScanComplete] = useState(false);
   const [fileFormat, setFileFormat] = useState('csv'); // 'csv' or 'image'
   const [processingStatus, setProcessingStatus] = useState('');
+
+  // Marking scheme settings
+  const [useNegativeMarking, setUseNegativeMarking] = useState(true);
+  const [correctMarks, setCorrectMarks] = useState(4);
+  const [wrongMarks, setWrongMarks] = useState(-1);
+  const [unattemptedMarks, setUnattemptedMarks] = useState(0);
+
   const navigate = useNavigate();
 
   const parseAnswerKey = (file) => {
@@ -55,7 +63,7 @@ const Upload = () => {
 
   const processImageFiles = async () => {
     setProcessingStatus('Processing image files...');
-    
+
     // Process answer key image (always single page)
     let parsedAnswerKey = [];
     if (answerKey.length > 0) {
@@ -69,38 +77,73 @@ const Upload = () => {
 
     // Process student sheets - handle multi-page PDFs
     let students = [];
+    let invalidSheets = [];
+
     if (studentSheets.length > 0) {
       for (let i = 0; i < studentSheets.length; i++) {
         const file = studentSheets[i];
         setProcessingStatus(`Processing file ${i + 1} of ${studentSheets.length}...`);
-        
+
         // Check if it's a PDF - if so, process all pages
         if (file.type === 'application/pdf') {
           setProcessingStatus(`Processing multi-page PDF ${i + 1}...`);
           const allStudentsInPDF = await processMultiPagePDF(file);
-          
+
           // Add all students from this PDF
           allStudentsInPDF.forEach((studentData, pageIndex) => {
             setProcessingStatus(`Processed page ${pageIndex + 1} of ${allStudentsInPDF.length} in PDF ${i + 1}`);
-            students.push({
-              name: studentData.name,
-              rollNumber: studentData.rollNumber,
-              answers: studentData.answers
-            });
+
+            // Check if sheet is valid
+            if (!studentData.isValid) {
+              invalidSheets.push({
+                fileNumber: i + 1,
+                pageNumber: studentData.pageNumber || pageIndex + 1,
+                reason: studentData.validation?.reason || 'Unable to process sheet',
+                name: studentData.name,
+                rollNumber: studentData.rollNumber,
+                hallTicket: studentData.hallTicket
+              });
+            } else {
+              students.push({
+                name: studentData.name,
+                rollNumber: studentData.rollNumber,
+                hallTicket: studentData.hallTicket,
+                batch: studentData.batch,
+                mobile: studentData.mobile,
+                answers: studentData.answers,
+                imageDataUrl: studentData.imageDataUrl
+              });
+            }
           });
         } else {
           // Single image file
           const studentData = await processOMRSheet(file);
-          students.push({
-            name: studentData.name,
-            rollNumber: studentData.rollNumber,
-            answers: studentData.answers
-          });
+
+          // Check if sheet is valid
+          if (!studentData.isValid) {
+            invalidSheets.push({
+              fileNumber: i + 1,
+              reason: studentData.validation?.reason || 'Unable to process sheet',
+              name: studentData.name,
+              rollNumber: studentData.rollNumber,
+              hallTicket: studentData.hallTicket
+            });
+          } else {
+            students.push({
+              name: studentData.name,
+              rollNumber: studentData.rollNumber,
+              hallTicket: studentData.hallTicket,
+              batch: studentData.batch,
+              mobile: studentData.mobile,
+              answers: studentData.answers,
+              imageDataUrl: studentData.imageDataUrl
+            });
+          }
         }
       }
     }
 
-    return { parsedAnswerKey, students };
+    return { parsedAnswerKey, students, invalidSheets };
   };
 
   const calculateResults = async () => {
@@ -111,12 +154,14 @@ const Upload = () => {
     try {
       let parsedAnswerKey = [];
       let students = [];
+      let invalidSheets = [];
 
       if (fileFormat === 'image') {
         // Process image/PDF files
         const result = await processImageFiles();
         parsedAnswerKey = result.parsedAnswerKey;
         students = result.students;
+        invalidSheets = result.invalidSheets;
 
         // Use demo data if no files uploaded
         if (answerKey.length === 0) {
@@ -128,8 +173,8 @@ const Upload = () => {
 
         if (studentSheets.length === 0) {
           students = [
-            { name: 'John Doe', rollNumber: '001', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
-            { name: 'Jane Smith', rollNumber: '002', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
+            { name: 'John Doe', rollNumber: '001', hallTicket: 'HT001', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
+            { name: 'Jane Smith', rollNumber: '002', hallTicket: 'HT002', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
           ];
         }
       } else {
@@ -150,45 +195,94 @@ const Upload = () => {
           }
         } else {
           students = [
-            { name: 'John Doe', rollNumber: '001', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
-            { name: 'Jane Smith', rollNumber: '002', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
-            { name: 'Mike Johnson', rollNumber: '003', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
-            { name: 'Emily Brown', rollNumber: '004', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
-            { name: 'David Wilson', rollNumber: '005', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
+            { name: 'John Doe', rollNumber: '001', hallTicket: 'HT001', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
+            { name: 'Jane Smith', rollNumber: '002', hallTicket: 'HT002', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
+            { name: 'Mike Johnson', rollNumber: '003', hallTicket: 'HT003', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
+            { name: 'Emily Brown', rollNumber: '004', hallTicket: 'HT004', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
+            { name: 'David Wilson', rollNumber: '005', hallTicket: 'HT005', answers: parsedAnswerKey.map(() => ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)]) },
           ];
         }
       }
 
-      // Calculate marks
+      // Calculate marks with NEET-style marking (+4 correct, -1 wrong, 0 unattempted)
       const results = students.map(student => {
         let correctAnswers = 0;
+        let wrongAnswers = 0;
+        let unattempted = 0;
+        const detailedAnswers = [];
+
         parsedAnswerKey.forEach((keyAnswer, index) => {
-          if (student.answers[index] === keyAnswer.answer) {
+          const studentAnswer = student.answers[index] || '';
+          const isCorrect = studentAnswer && studentAnswer === keyAnswer.answer;
+          const isAttempted = studentAnswer && studentAnswer.trim() !== '';
+
+          if (isCorrect) {
             correctAnswers++;
+          } else if (isAttempted) {
+            wrongAnswers++;
+          } else {
+            unattempted++;
           }
+
+          detailedAnswers.push({
+            questionNumber: index + 1,
+            correctAnswer: keyAnswer.answer,
+            studentAnswer: studentAnswer,
+            isCorrect,
+            isAttempted
+          });
         });
-        
+
         const totalQuestions = parsedAnswerKey.length;
-        const marks = Math.round((correctAnswers / totalQuestions) * 100);
+        // Apply marking scheme
+        const totalMarks = (correctAnswers * correctMarks) +
+                          (useNegativeMarking ? (wrongAnswers * wrongMarks) : 0) +
+                          (unattempted * unattemptedMarks);
+        const maxMarks = totalQuestions * correctMarks;
+        const percentage = ((totalMarks / maxMarks) * 100).toFixed(2);
 
         return {
           name: student.name,
           rollNumber: student.rollNumber,
+          hallTicket: student.hallTicket || 'N/A',
+          batch: student.batch || 'N/A',
+          mobile: student.mobile || 'N/A',
           class: selectedClass || 'Not specified',
-          marks,
+          totalMarks,
+          maxMarks,
+          percentage: parseFloat(percentage),
           totalQuestions,
-          correctAnswers
+          correctAnswers,
+          wrongAnswers,
+          unattempted,
+          detailedAnswers,
+          imageDataUrl: student.imageDataUrl,
+          answerKey: parsedAnswerKey
         };
       });
 
-      // Sort by marks and assign ranks
-      results.sort((a, b) => b.marks - a.marks);
+      // Sort by total marks and assign ranks
+      results.sort((a, b) => b.totalMarks - a.totalMarks);
       results.forEach((result, index) => {
         result.rank = index + 1;
       });
 
-      // Save to localStorage
+      // Save images to IndexedDB and remove from results
+      for (const result of results) {
+        if (result.imageDataUrl) {
+          try {
+            await saveImage(result.rollNumber, result.imageDataUrl);
+            delete result.imageDataUrl; // Remove to save localStorage space
+          } catch (err) {
+            console.warn('Failed to save image to IndexedDB', err);
+            delete result.imageDataUrl; // Remove anyway to prevent quota issues
+          }
+        }
+      }
+
+      // Save to localStorage (without large image data)
       localStorage.setItem('omr_results', JSON.stringify(results));
+      localStorage.setItem('omr_invalid_sheets', JSON.stringify(invalidSheets));
       localStorage.setItem('last_scan_time', new Date().toLocaleString());
 
       // Simulate scanning delay
@@ -203,7 +297,7 @@ const Upload = () => {
       console.error('Error scanning sheets:', error);
       setIsScanning(false);
       setProcessingStatus('');
-      
+
       // Show specific error message
       const errorMessage = error.message || 'Error processing files. Please check the format and try again.';
       alert(errorMessage);
@@ -349,6 +443,97 @@ const Upload = () => {
             <option value="Class 11">Class 11</option>
             <option value="Class 12">Class 12</option>
           </select>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45 }}
+        className="card"
+      >
+        <h2 className="text-xl font-semibold text-gray-800 mb-6">
+          Step 5: Marking Scheme
+        </h2>
+
+        <div className="space-y-4">
+          {/* Negative Marking Toggle */}
+          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+            <div>
+              <label className="text-sm font-semibold text-gray-800">Enable Negative Marking</label>
+              <p className="text-xs text-gray-600 mt-1">Deduct marks for wrong answers</p>
+            </div>
+            <button
+              onClick={() => setUseNegativeMarking(!useNegativeMarking)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                useNegativeMarking ? 'bg-primary-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  useNegativeMarking ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Marking Values */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Marks for Correct Answer
+              </label>
+              <input
+                type="number"
+                value={correctMarks}
+                onChange={(e) => setCorrectMarks(Number(e.target.value))}
+                className="input-field"
+                min="1"
+                step="0.5"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Marks for Wrong Answer
+              </label>
+              <input
+                type="number"
+                value={wrongMarks}
+                onChange={(e) => setWrongMarks(Number(e.target.value))}
+                className="input-field"
+                max="0"
+                step="0.5"
+                disabled={!useNegativeMarking}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Marks for Unattempted
+              </label>
+              <input
+                type="number"
+                value={unattemptedMarks}
+                onChange={(e) => setUnattemptedMarks(Number(e.target.value))}
+                className="input-field"
+                step="0.5"
+              />
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm font-semibold text-green-800 mb-2">Marking Scheme Preview:</p>
+            <p className="text-xs text-green-700">
+              <span className="font-medium">Correct:</span> +{correctMarks} marks |
+              <span className="font-medium ml-2">Wrong:</span> {useNegativeMarking ? wrongMarks : 0} marks |
+              <span className="font-medium ml-2">Unattempted:</span> {unattemptedMarks} marks
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              Max Marks per question: {correctMarks} | Example: 100 questions = {correctMarks * 100} max marks
+            </p>
+          </div>
         </div>
       </motion.div>
 
